@@ -1,0 +1,31 @@
+<package format="2">
+
+  <!-- Package metadata -->
+  <name>mavlink_ros</name>
+  <version>0.0.0</version>
+  <description>
+     Defines the serial interface process for MAVLink messages.
+  </description>
+  <license>BSD</license>
+  <author>Amir Melzer, Stefan Leutenegger, Gabriel Agamennoni</author>
+  <maintainer email="amir.melzer@mavt.ethz.ch">Amir Melzer</maintainer>
+  <maintainer email="stefan.leutenegger@mavt.ethz.ch">Stefan Leutenegger</maintainer>
+  <maintainer email="gabriel.agamennoni@mavt.ethz.ch">Gabriel Agamennoni</maintainer>
+
+  <!-- Required by Catkin -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Package dependencies -->
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>gps_common</depend>
+
+  <!-- Package build dependencies -->
+  <depend>message_generation</depend>
+
+  <!-- Package runtime dependencies -->
+  <depend>message_runtime</depend>
+
+</package>

@@ -1,0 +1,7 @@
+# Eclipse project files
+.cproject
+.project
+.settings
+
+# Temporary editor files
+*.*~
