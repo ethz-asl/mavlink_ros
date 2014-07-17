@@ -36,10 +36,10 @@
 #include "ros/ros.h"
 
 #include "mavlink_ros/Mavlink.h"
-#include "mavlink_ros/AslCtrlDataSub.h"
-#include "mavlink_ros/AslCtrlDebug.h"
+#include "mavlink_ros/AslctrlData.h"
+#include "mavlink_ros/AslctrlDebug.h"
 #include "mavlink_ros/CustomSensorData.h"
-#include "mavlink_ros/ServoOutputRaw.h"
+#include "mavlink_ros/ServoOutput.h"
 
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
@@ -105,10 +105,17 @@ ros::Publisher mag_pub;
 ros::Publisher static_pressure_pub;
 ros::Publisher dynamic_pressure_pub;
 ros::Publisher ambient_temperature_pub;
+ros::Publisher custom_sensor_data_pub;
+ros::Publisher aslctrl_data_pub;
+ros::Publisher aslctrl_debug_pub;
+ros::Publisher servo_output_pub;
 
 mavlink_highres_imu_t imu_raw;
 mavlink_gps_raw_int_t gps_raw;
 mavlink_custom_sensor_data_t cust_raw;
+mavlink_aslctrl_data_t aslctrl_data_raw;
+mavlink_aslctrl_debug_t aslctrl_debug_raw;
+mavlink_servo_output_raw_t servo_output_raw;
 std::string frame_id("px4");
 
 // from asctec_hl_interface
@@ -522,11 +529,11 @@ void* serial_wait(void* serial_ptr) {
           }
 
           // static pressure
-          if (static_pressure_pub.getNumSubscribers() > 0){
+          if (static_pressure_pub.getNumSubscribers() > 0) {
             sensor_msgs::FluidPressurePtr static_pressure_msg(
                 new sensor_msgs::FluidPressure);
 
-            static_pressure_msg->fluid_pressure = imu_raw.abs_pressure*100; // convert to Pa
+            static_pressure_msg->fluid_pressure = imu_raw.abs_pressure * 100;  // convert to Pa
             static_pressure_msg->header = header;
             static_pressure_pub.publish(static_pressure_msg);
 
@@ -539,10 +546,12 @@ void* serial_wait(void* serial_ptr) {
           break;
 
         case MAVLINK_MSG_ID_GPS_RAW_INT: {
-          /* decode message */
+
+          // decode message
           mavlink_msg_gps_raw_int_decode(&message, &gps_raw);
 
           std_msgs::Header header;
+
           // TODO->Amir: find out, if this is actually the gps time...
           header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
           header.seq = gps_raw.time_usec / 1000;
@@ -552,13 +561,19 @@ void* serial_wait(void* serial_ptr) {
 
             gps_common::GPSFixPtr gps_msg(new gps_common::GPSFix);
 
+            gps_msg->header = header;
+
+            // populate message fields
             gps_msg->latitude = double(gps_raw.lat) * 1.0e-7;  // deg
             gps_msg->longitude = double(gps_raw.lon) * 1.0e-7;  // deg
             gps_msg->altitude = double(gps_raw.alt) * 1.0e-3;  // deg
+            gps_msg->hdop = double(gps_raw.eph) * 1.0e-2; // m
+            gps_msg->vdop = double(gps_raw.epv) * 1.0e-2; // m
+            gps_msg->speed = double(gps_raw.vel) * 1.0e-2; // m/s
 
-            // TODO->Amir: it would be great to have also accuracy values from the px4...!!
-            gps_msg->header = header;
+            // TODO: Add other fields
 
+            // publish message
             gps_pub.publish(gps_msg);
 
             if (verbose)
@@ -569,8 +584,10 @@ void* serial_wait(void* serial_ptr) {
         }
           break;
 
-        case MAVLINK_MSG_ID_CUSTOM_SENSOR_DATA: {
-          /* decode message */
+
+
+        /*case MAVLINK_MSG_ID_CUSTOM_SENSOR_DATA: {
+
           mavlink_msg_custom_sensor_data_decode(&message, &cust_raw);
 
           std_msgs::Header header;
@@ -582,7 +599,8 @@ void* serial_wait(void* serial_ptr) {
           // publish dynamic pressure
           if (dynamic_pressure_pub.getNumSubscribers() > 0) {
 
-            sensor_msgs::FluidPressurePtr dynamic_pressure_msg(new sensor_msgs::FluidPressure);
+            sensor_msgs::FluidPressurePtr dynamic_pressure_msg(
+                new sensor_msgs::FluidPressure);
             dynamic_pressure_msg->fluid_pressure = cust_raw.dbaro_pres_pa;
             dynamic_pressure_msg->header = header;
             dynamic_pressure_pub.publish(dynamic_pressure_msg);
@@ -595,13 +613,194 @@ void* serial_wait(void* serial_ptr) {
           // publish ambient temperature
           if (ambient_temperature_pub.getNumSubscribers() > 0) {
 
-            sensor_msgs::TemperaturePtr ambient_temperature_msg(new sensor_msgs::Temperature);
-            ambient_temperature_msg->temperature = cust_raw.amb_temp_celsius; // deg Celsius
+            sensor_msgs::TemperaturePtr ambient_temperature_msg(
+                new sensor_msgs::Temperature);
+            ambient_temperature_msg->temperature = cust_raw.amb_temp_celsius;  // deg Celsius
             ambient_temperature_msg->header = header;
             ambient_temperature_pub.publish(ambient_temperature_msg);
 
             if (verbose)
               ROS_INFO_THROTTLE(1, "Published IMU message (sys:%d|comp:%d):\n",
+                                message.sysid, message.compid);
+          }
+
+        }
+          break;*/
+
+        case MAVLINK_MSG_ID_ASLCTRL_DATA: {
+
+          // decode message
+          mavlink_msg_aslctrl_data_decode(&message, &aslctrl_data_raw);
+
+          std_msgs::Header header;
+
+          // TODO->Amir: find out, if this is actually the gps time...
+          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.seq = cust_raw.mppt_timestamp / 1000;
+          header.frame_id = frame_id;
+
+          if (aslctrl_data_pub.getNumSubscribers() > 0) {
+
+            mavlink_ros::AslctrlDataPtr aslctrl_data_msg(
+                new mavlink_ros::AslctrlData);
+
+            aslctrl_data_msg->header = header;
+
+            // populate message fields
+            aslctrl_data_msg->h = aslctrl_data_raw.h;
+            aslctrl_data_msg->hRef = aslctrl_data_raw.hRef;
+            aslctrl_data_msg->hRef_t = aslctrl_data_raw.hRef_t;
+            aslctrl_data_msg->PitchAngle = aslctrl_data_raw.PitchAngle;
+            aslctrl_data_msg->PitchAngleRef = aslctrl_data_raw.PitchAngleRef;
+            aslctrl_data_msg->q = aslctrl_data_raw.q;
+            aslctrl_data_msg->qRef = aslctrl_data_raw.qRef;
+            aslctrl_data_msg->uElev = aslctrl_data_raw.uElev;
+            aslctrl_data_msg->uThrot = aslctrl_data_raw.uThrot;
+            aslctrl_data_msg->uThrot2 = aslctrl_data_raw.uThrot2;
+            aslctrl_data_msg->aZ = aslctrl_data_raw.aZ;
+            aslctrl_data_msg->YawAngle = aslctrl_data_raw.YawAngle;
+            aslctrl_data_msg->YawAngleRef = aslctrl_data_raw.YawAngleRef;
+            aslctrl_data_msg->RollAngle = aslctrl_data_raw.RollAngle;
+            aslctrl_data_msg->p = aslctrl_data_raw.p;
+            aslctrl_data_msg->pRef = aslctrl_data_raw.pRef;
+            aslctrl_data_msg->r = aslctrl_data_raw.r;
+            aslctrl_data_msg->rRef = aslctrl_data_raw.rRef;
+            aslctrl_data_msg->uAil = aslctrl_data_raw.uAil;
+            aslctrl_data_msg->uRud = aslctrl_data_raw.uRud;
+            aslctrl_data_msg->aslctrl_mode = aslctrl_data_raw.aslctrl_mode;
+
+            // publish message
+            aslctrl_data_pub.publish(aslctrl_data_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published AslctrlData message (sys:%d|comp:%d):\n",
+                                message.sysid, message.compid);
+          }
+
+        }
+          break;
+
+        case MAVLINK_MSG_ID_ASLCTRL_DEBUG: {
+
+          // decode message
+          mavlink_msg_aslctrl_debug_decode(&message, &aslctrl_debug_raw);
+
+          std_msgs::Header header;
+
+          // TODO->Amir: find out, if this is actually the gps time...
+          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.seq = cust_raw.mppt_timestamp / 1000;
+          header.frame_id = frame_id;
+
+          if (aslctrl_debug_pub.getNumSubscribers() > 0) {
+
+            mavlink_ros::AslctrlDebugPtr aslctrl_debug_msg(
+                new mavlink_ros::AslctrlDebug);
+
+            aslctrl_debug_msg->header = header;
+
+            // populate message fields
+            aslctrl_debug_msg->i32_1 = aslctrl_debug_raw.i32_1;
+            aslctrl_debug_msg->f_1 = aslctrl_debug_raw.f_1;
+            aslctrl_debug_msg->f_2 = aslctrl_debug_raw.f_2;
+            aslctrl_debug_msg->f_3 = aslctrl_debug_raw.f_3;
+            aslctrl_debug_msg->f_4 = aslctrl_debug_raw.f_4;
+            aslctrl_debug_msg->f_5 = aslctrl_debug_raw.f_5;
+            aslctrl_debug_msg->f_6 = aslctrl_debug_raw.f_6;
+            aslctrl_debug_msg->f_7 = aslctrl_debug_raw.f_7;
+            aslctrl_debug_msg->f_8 = aslctrl_debug_raw.f_8;
+            aslctrl_debug_msg->i8_1 = aslctrl_debug_raw.i8_1;
+            aslctrl_debug_msg->i8_2 = aslctrl_debug_raw.i8_2;
+
+            // publish message
+            aslctrl_debug_pub.publish(aslctrl_debug_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published AslctrlDebug message (sys:%d|comp:%d):\n",
+                                message.sysid, message.compid);
+          }
+
+        }
+          break;
+
+        case MAVLINK_MSG_ID_CUSTOM_SENSOR_DATA: {
+
+          // decode message
+          mavlink_msg_custom_sensor_data_decode(&message, &cust_raw);
+
+          std_msgs::Header header;
+
+          // TODO->Amir: find out, if this is actually the gps time...
+          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.seq = cust_raw.mppt_timestamp / 1000;
+          header.frame_id = frame_id;
+
+          if (custom_sensor_data_pub.getNumSubscribers() > 0) {
+
+            mavlink_ros::CustomSensorDataPtr custom_sensor_data_msg(
+                new mavlink_ros::CustomSensorData);
+
+            custom_sensor_data_msg->header = header;
+
+            // populate message fields
+            custom_sensor_data_msg->dbaro_pres_pa = cust_raw.dbaro_pres_pa;
+            custom_sensor_data_msg->dbaro_velo_ms = cust_raw.dbaro_velo_ms;
+            custom_sensor_data_msg->amb_temp_celsius = cust_raw.amb_temp_celsius;
+            custom_sensor_data_msg->adc121_vspb_volt = cust_raw.adc121_vspb_volt;
+            custom_sensor_data_msg->adc121_cspb_amp = cust_raw.adc121_cspb_amp;
+            custom_sensor_data_msg->adc121_cs1_amp = cust_raw.adc121_cs1_amp;
+            custom_sensor_data_msg->adc121_cs2_amp = cust_raw.adc121_cs2_amp;
+            custom_sensor_data_msg->mppt1_volt = cust_raw.mppt1_volt;
+            custom_sensor_data_msg->mppt1_amp = cust_raw.mppt1_amp;
+            custom_sensor_data_msg->mppt2_volt = cust_raw.mppt2_volt;
+            custom_sensor_data_msg->mppt2_amp = cust_raw.mppt2_amp;
+            custom_sensor_data_msg->mppt3_volt = cust_raw.mppt3_volt;
+            custom_sensor_data_msg->mppt3_amp = cust_raw.mppt3_amp;
+            custom_sensor_data_msg->mppt1_pwm = cust_raw.mppt1_pwm;
+            custom_sensor_data_msg->mppt2_pwm = cust_raw.mppt2_pwm;
+            custom_sensor_data_msg->mppt3_pwm = cust_raw.mppt3_pwm;
+            custom_sensor_data_msg->mppt1_status = cust_raw.mppt1_status;
+            custom_sensor_data_msg->mppt2_status = cust_raw.mppt2_status;
+            custom_sensor_data_msg->mppt3_status = cust_raw.mppt3_status;
+
+            // publish message
+            custom_sensor_data_pub.publish(custom_sensor_data_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published CustomSensorData message (sys:%d|comp:%d):\n",
+                                message.sysid, message.compid);
+          }
+
+        }
+          break;
+
+        case MAVLINK_MSG_ID_SERVO_OUTPUT_RAW: {
+
+          // decode message
+          mavlink_msg_servo_output_raw_decode(&message, &servo_output_raw);
+
+          std_msgs::Header header;
+
+          // TODO->Amir: find out, if this is actually the gps time...
+          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.seq = cust_raw.mppt_timestamp / 1000;
+          header.frame_id = frame_id;
+
+          if (servo_output_pub.getNumSubscribers() > 0) {
+
+            mavlink_ros::ServoOutputPtr servo_output_msg(
+                new mavlink_ros::ServoOutput);
+
+            servo_output_msg->header = header;
+
+            // populate message fields
+            servo_output_msg->time_usec = servo_output_raw.time_usec;
+
+            // publish message
+            servo_output_pub.publish(servo_output_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published ServoOutput message (sys:%d|comp:%d):\n",
                                 message.sysid, message.compid);
           }
 
@@ -716,9 +915,20 @@ int main(int argc, char **argv) {
   imu_raw_pub = raw_nh.advertise<sensor_msgs::Imu>("imu", 10);
   mag_pub = raw_nh.advertise<sensor_msgs::MagneticField>("mag", 10);
   gps_pub = raw_nh.advertise<gps_common::GPSFix>("gps", 10);
-  static_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>("static_pressure", 10);
-  dynamic_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>("dynamic_pressure", 10);
-  ambient_temperature_pub = raw_nh.advertise<sensor_msgs::Temperature>("ambient_temperature", 10);
+  static_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>(
+      "static_pressure", 10);
+  dynamic_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>(
+      "dynamic_pressure", 10);
+  ambient_temperature_pub = raw_nh.advertise<sensor_msgs::Temperature>(
+      "ambient_temperature", 10);
+  custom_sensor_data_pub = raw_nh.advertise<mavlink_ros::CustomSensorData>(
+      "custom_sensor_data", 10);
+  aslctrl_data_pub = raw_nh.advertise<mavlink_ros::AslctrlData>(
+      "aslctrl_data", 10);
+  aslctrl_debug_pub = raw_nh.advertise<mavlink_ros::AslctrlDebug>(
+      "aslctrl_debug", 10);
+  servo_output_pub = raw_nh.advertise<mavlink_ros::ServoOutput>(
+      "servo_output_raw", 10);
 
   GThread* serial_thread;
   GError* err;
