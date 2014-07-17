@@ -45,7 +45,8 @@
 #include "sensor_msgs/MagneticField.h"
 #include "sensor_msgs/Temperature.h"
 #include "sensor_msgs/FluidPressure.h"
-#include "gps_common/GPSFix.h"
+//#include "gps_common/GPSFix.h"
+#include "sensor_msgs/NavSatFix.h"
 
 #include "mavlink/v1.0/ASLUAV/mavlink.h"
 #include <glib.h>
@@ -545,7 +546,7 @@ void* serial_wait(void* serial_ptr) {
         }
           break;
 
-        case MAVLINK_MSG_ID_GPS_RAW_INT: {
+        /*case MAVLINK_MSG_ID_GPS_RAW_INT: {
 
           // decode message
           mavlink_msg_gps_raw_int_decode(&message, &gps_raw);
@@ -577,14 +578,52 @@ void* serial_wait(void* serial_ptr) {
             gps_pub.publish(gps_msg);
 
             if (verbose)
-              ROS_INFO_THROTTLE(1, "Published IMU message (sys:%d|comp:%d):\n",
+              ROS_INFO_THROTTLE(1, "Published GPS message (sys:%d|comp:%d):\n",
+                                message.sysid, message.compid);
+          }
+
+        }
+          break;*/
+
+        case MAVLINK_MSG_ID_GPS_RAW_INT: {
+
+          // decode message
+          mavlink_msg_gps_raw_int_decode(&message, &gps_raw);
+
+          std_msgs::Header header;
+
+          // TODO->Amir: find out, if this is actually the gps time...
+          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.seq = gps_raw.time_usec / 1000;
+          header.frame_id = frame_id;
+
+          if (gps_pub.getNumSubscribers() > 0) {
+
+            sensor_msgs::NavSatFixPtr gps_msg(new sensor_msgs::NavSatFix);
+
+            gps_msg->header = header;
+
+            double vel = double(gps_raw.vel) * 1.0e-2; // m/s
+
+            // populate message fields
+            gps_msg->latitude = double(gps_raw.lat) * 1.0e-7;  // deg
+            gps_msg->longitude = double(gps_raw.lon) * 1.0e-7;  // deg
+            gps_msg->altitude = double(gps_raw.alt) * 1.0e-3;  // deg
+            gps_msg->position_covariance[0] = double(gps_raw.eph) * 1.0e-2; // m
+            gps_msg->position_covariance[4] = double(gps_raw.epv) * 1.0e-2; // m
+
+            // TODO: Add other fields
+
+            // publish message
+            gps_pub.publish(gps_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published GPS message (sys:%d|comp:%d):\n",
                                 message.sysid, message.compid);
           }
 
         }
           break;
-
-
 
         /*case MAVLINK_MSG_ID_CUSTOM_SENSOR_DATA: {
 
@@ -795,6 +834,15 @@ void* serial_wait(void* serial_ptr) {
 
             // populate message fields
             servo_output_msg->time_usec = servo_output_raw.time_usec;
+            servo_output_msg->servo1_raw = servo_output_raw.servo1_raw;
+            servo_output_msg->servo2_raw = servo_output_raw.servo2_raw;
+            servo_output_msg->servo3_raw = servo_output_raw.servo3_raw;
+            servo_output_msg->servo4_raw = servo_output_raw.servo4_raw;
+            servo_output_msg->servo5_raw = servo_output_raw.servo5_raw;
+            servo_output_msg->servo6_raw = servo_output_raw.servo6_raw;
+            servo_output_msg->servo7_raw = servo_output_raw.servo7_raw;
+            servo_output_msg->servo8_raw = servo_output_raw.servo8_raw;
+            servo_output_msg->port = servo_output_raw.port;
 
             // publish message
             servo_output_pub.publish(servo_output_msg);
@@ -914,7 +962,8 @@ int main(int argc, char **argv) {
   ros::NodeHandle raw_nh("px4/raw");
   imu_raw_pub = raw_nh.advertise<sensor_msgs::Imu>("imu", 10);
   mag_pub = raw_nh.advertise<sensor_msgs::MagneticField>("mag", 10);
-  gps_pub = raw_nh.advertise<gps_common::GPSFix>("gps", 10);
+  //gps_pub = raw_nh.advertise<gps_common::GPSFix>("gps", 10);
+  gps_pub = raw_nh.advertise<sensor_msgs::NavSatFix>("gps", 10);
   static_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>(
       "static_pressure", 10);
   dynamic_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>(
