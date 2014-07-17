@@ -36,6 +36,11 @@
 #include "ros/ros.h"
 
 #include "mavlink_ros/Mavlink.h"
+#include "mavlink_ros/AslCtrlDataSub.h"
+#include "mavlink_ros/AslCtrlDebug.h"
+#include "mavlink_ros/CustomSensorData.h"
+#include "mavlink_ros/ServoOutputRaw.h"
+
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
 #include "sensor_msgs/Temperature.h"
@@ -53,6 +58,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <fstream>
+
 // Serial includes
 #include <stdio.h>   /* Standard input/output definitions */
 #include <string.h>  /* String function definitions */
