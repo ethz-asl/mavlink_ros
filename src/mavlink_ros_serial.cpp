@@ -603,14 +603,17 @@ void* serial_wait(void* serial_ptr) {
 
             gps_msg->header = header;
 
+            double eph = double(gps_raw.eph) * 1.0e-2; // m
+            double epv = double(gps_raw.epv) * 1.0e-2; // m
             double vel = double(gps_raw.vel) * 1.0e-2; // m/s
 
             // populate message fields
             gps_msg->latitude = double(gps_raw.lat) * 1.0e-7;  // deg
             gps_msg->longitude = double(gps_raw.lon) * 1.0e-7;  // deg
-            gps_msg->altitude = double(gps_raw.alt) * 1.0e-3;  // deg
-            gps_msg->position_covariance[0] = double(gps_raw.eph) * 1.0e-2; // m
-            gps_msg->position_covariance[4] = double(gps_raw.epv) * 1.0e-2; // m
+            gps_msg->altitude = double(gps_raw.alt) * 1.0e-3;  // m
+            gps_msg->position_covariance[0] = eph * eph; // m^2
+            gps_msg->position_covariance[4] = eph * eph; // m^2
+            gps_msg->position_covariance[8] = epv * epv; // m^2
 
             // TODO: Add other fields
 
