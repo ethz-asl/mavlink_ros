@@ -14,18 +14,15 @@
 
   <!-- Required by Catkin -->
   <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
 
   <!-- Package dependencies -->
   <depend>roscpp</depend>
   <depend>rospy</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>gps_common</depend>
-
-  <!-- Package build dependencies -->
-  <depend>message_generation</depend>
-
-  <!-- Package runtime dependencies -->
-  <depend>message_runtime</depend>
 
 </package>

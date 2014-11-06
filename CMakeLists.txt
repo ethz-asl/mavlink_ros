@@ -20,8 +20,8 @@ INCLUDE_DIRECTORIES(
   ../include/
 )
 
-#find_package(GLIB2  REQUIRED)
-#find_package(GTHREAD2  REQUIRED)
+find_package(GLIB2  REQUIRED)
+find_package(GTHREAD2  REQUIRED)
 
 # Declare an executable and specify libraries to link against
 cs_add_executable(mavlink_ros_serial src/mavlink_ros_serial.cpp)
