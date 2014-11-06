@@ -40,6 +40,7 @@
 #include "mavlink_ros/AslctrlDebug.h"
 #include "mavlink_ros/CustomSensorData.h"
 #include "mavlink_ros/ServoOutput.h"
+#include "mavlink_ros/GlobalPosition.h"
 
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
@@ -110,6 +111,7 @@ ros::Publisher custom_sensor_data_pub;
 ros::Publisher aslctrl_data_pub;
 ros::Publisher aslctrl_debug_pub;
 ros::Publisher servo_output_pub;
+ros::Publisher global_position_pub;
 
 mavlink_highres_imu_t imu_raw;
 mavlink_gps_raw_int_t gps_raw;
@@ -117,6 +119,7 @@ mavlink_custom_sensor_data_t cust_raw;
 mavlink_aslctrl_data_t aslctrl_data_raw;
 mavlink_aslctrl_debug_t aslctrl_debug_raw;
 mavlink_servo_output_raw_t servo_output_raw;
+mavlink_global_position_int_t global_position;
 std::string frame_id("px4");
 
 // from asctec_hl_interface
@@ -677,7 +680,7 @@ void* serial_wait(void* serial_ptr) {
           std_msgs::Header header;
 
           // TODO->Amir: find out, if this is actually the gps time...
-          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.stamp = ros::Time::now();
           header.seq = cust_raw.mppt_timestamp / 1000;
           header.frame_id = frame_id;
 
@@ -730,7 +733,7 @@ void* serial_wait(void* serial_ptr) {
           std_msgs::Header header;
 
           // TODO->Amir: find out, if this is actually the gps time...
-          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.stamp = ros::Time::now();
           header.seq = cust_raw.mppt_timestamp / 1000;
           header.frame_id = frame_id;
 
@@ -773,7 +776,7 @@ void* serial_wait(void* serial_ptr) {
           std_msgs::Header header;
 
           // TODO->Amir: find out, if this is actually the gps time...
-          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.stamp = ros::Time::now();
           header.seq = cust_raw.mppt_timestamp / 1000;
           header.frame_id = frame_id;
 
@@ -824,7 +827,7 @@ void* serial_wait(void* serial_ptr) {
           std_msgs::Header header;
 
           // TODO->Amir: find out, if this is actually the gps time...
-          header.stamp = ros::Time::now();  //ros::Time(double(gps_raw.time_usec)*1.0e6);
+          header.stamp = ros::Time::now();
           header.seq = cust_raw.mppt_timestamp / 1000;
           header.frame_id = frame_id;
 
@@ -852,6 +855,46 @@ void* serial_wait(void* serial_ptr) {
 
             if (verbose)
               ROS_INFO_THROTTLE(1, "Published ServoOutput message (sys:%d|comp:%d):\n",
+                                message.sysid, message.compid);
+          }
+
+        }
+          break;
+
+        case MAVLINK_MSG_ID_GLOBAL_POSITION_INT: {
+
+          // decode message
+          mavlink_msg_global_position_int_decode(&message, &global_position);
+
+          std_msgs::Header header;
+
+          // TODO->Amir: find out, if this is actually the gps time...
+          header.stamp = ros::Time::now();
+          header.seq = global_position.time_boot_ms;
+          header.frame_id = frame_id;
+
+          if (global_position_pub.getNumSubscribers() > 0) {
+
+            mavlink_ros::GlobalPositionPtr global_position_msg(new mavlink_ros::GlobalPosition);
+
+            global_position_msg->header = header;
+
+            // populate message fields
+            global_position_msg->time_boot_ms = double(global_position.time_boot_ms) * 1.0e-3;  // seconds
+            global_position_msg->lat = double(global_position.lat) * 1.0e-7;  // meters
+            global_position_msg->lon = double(global_position.lon) * 1.0e-7;  // meters
+            global_position_msg->alt = double(global_position.alt) * 1.0e-3;  // meters
+            global_position_msg->relative_alt = double(global_position.relative_alt) * 1.0e-3;  // meters
+            global_position_msg->vx = double(global_position.vx) * 1.0e-2;  // meters per second
+            global_position_msg->vy = double(global_position.vy) * 1.0e-2;  // meters per second
+            global_position_msg->vz = double(global_position.vz) * 1.0e-2;  // meters per second
+            global_position_msg->hdg = double(global_position.hdg) * 1.0e-2;  // degrees
+
+            // publish message
+            gps_pub.publish(global_position_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published GlobalPosition message (sys:%d|comp:%d):\n",
                                 message.sysid, message.compid);
           }
 
