@@ -1,0 +1,3 @@
+<launch>
+	<node name="mavlink_ros" pkg="mavlink_ros" type="mavlink_ros_serial" args="-b 230400" />
+</launch>
