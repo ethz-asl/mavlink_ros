@@ -891,7 +891,7 @@ void* serial_wait(void* serial_ptr) {
             global_position_msg->hdg = double(global_position.hdg) * 1.0e-2;  // degrees
 
             // publish message
-            gps_pub.publish(global_position_msg);
+            global_position_pub.publish(global_position_msg);
 
             if (verbose)
               ROS_INFO_THROTTLE(1, "Published GlobalPosition message (sys:%d|comp:%d):\n",
@@ -1010,6 +1010,7 @@ int main(int argc, char **argv) {
   mag_pub = raw_nh.advertise<sensor_msgs::MagneticField>("mag", 10);
   //gps_pub = raw_nh.advertise<gps_common::GPSFix>("gps", 10);
   gps_pub = raw_nh.advertise<sensor_msgs::NavSatFix>("gps", 10);
+  global_position_pub = raw_nh.advertise<mavlink_ros::GlobalPosition>("global_position", 10);
   static_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>(
       "static_pressure", 10);
   dynamic_pressure_pub = raw_nh.advertise<sensor_msgs::FluidPressure>(
